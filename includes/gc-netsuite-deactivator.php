@@ -1,7 +1,8 @@
 <?php
 
-class Gc_Netsuite_Deactivator{
-  public static function deactivate(){
-    
-  }
+class Gc_Netsuite_Deactivator
+{
+    public static function deactivate() {
+
+    }
 }

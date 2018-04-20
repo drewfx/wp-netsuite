@@ -1,62 +1,80 @@
 <?php
 
-class Gc_Netsuite{
+class Gc_Netsuite
+{
 
-  const CONFIG_NAME = 'gc_netsuite_settings';
+    const CONFIG_NAME = 'gc_netsuite_config';
 
-  protected $loader;
-  protected $version;
-  protected $plugin_name;
-  protected $plugin_display_name;
+    protected $loader;
+    protected $version;
+    protected $plugin_name;
+    protected $plugin_display_name;
 
-  protected static $config;
+    protected static $config;
 
-  public function __construct(){
-    $this->version = $this->return_or_define('GC_NETSUITE_VERSION', '1.0.0');
-    $this->plugin_name = $this->return_or_define('GC_NETSUITE_PLUGIN_NAME', 'gc_netsuite');
-    $this->$plugin_display_name = $this->return_or_define('GC_NETSUITE_PLUGIN_DISPLAY_NAME', 'GC Netsuite');
-    $this->load_dependencies();
-    $this->define_public_methods();
-  }
-
-  private function load_dependencies(){
-    require GC_NETSUITE_DIR . '/includes/gc-netsuite-loader.php';
-    require GC_NETSUITE_DIR . '/public/gc-netsuite-public.php';
-
-    $this->loader = new Gc_Netsuite_Loader();
-  }
-
-  private function define_public_methods(){
-    $plugin_public = new Gc_Netsuite_Public($this->plugin_name, $this->version);
-    $this->loader->add_filter( 'wpcf7_before_send_mail', $plugin_public, 'submit_posted_data', 10 , 1);
-  }
-
-  private function return_or_define($check_if_defined = null, $default = null){
-    if(!defined($check_if_defined)){
-      define($check_if_defined, $default);
+    public function __construct() {
+        $this->version             = GC_NETSUITE_VERSION;
+        $this->plugin_name         = GC_NETSUITE_PLUGIN_NAME;
+        $this->plugin_display_name = GC_NETSUITE_PLUGIN_DISPLAY_NAME;
+        $this->load_dependencies();
+        $this->define_public_methods();
     }
-    return $check_if_defined;
-  }
 
-  public function run(){
-    $this->loader->run();
-  }
+    private function load_dependencies() {
+        require GC_NETSUITE_DIR . '/includes/gc-netsuite-loader.php';
+        require GC_NETSUITE_DIR . '/public/gc-netsuite-public.php';
 
-  public function get_plugin_name(){
-    return $this->plugin_name;
-  }
+        $this->loader = new Gc_Netsuite_Loader();
+    }
 
-  public function get_plugin_display_name(){
-    return $this->$plugin_display_name;
-  }
+    private function define_public_methods() {
+        $plugin_public = new Gc_Netsuite_Public($this->plugin_name, $this->version);
+        $this->loader->add_filter('wpcf7_before_send_mail', $plugin_public, 'submit_posted_data', 10, 1);
+    }
 
-  public function get_loader(){
-    return $this->loader;
-  }
+    public function run() {
+        $this->loader->run();
+    }
 
-  public function get_version() {
-    return $this->version;
-  }
+    public function get_plugin_name() {
+        return $this->plugin_name;
+    }
 
+    public function get_plugin_display_name() {
+        return $this->plugin_display_name;
+    }
+
+    public function get_loader() {
+        return $this->loader;
+    }
+
+    public function get_version() {
+        return $this->version;
+    }
+
+    public static function get_config($field = null) {
+        if (!isset(self::$config)) {
+            self::$config = get_option(self::CONFIG_NAME);
+            if (!self::$config) {
+                return null;
+            }
+        }
+        if ($field) {
+            if (is_array($field)) {
+                $value = self::$config;
+                foreach ($field as $level) {
+                    if (isset($value[ $level ])) {
+                        $value = $value[ $level ];
+                    } else {
+                        return null;
+                    }
+                }
+            } else {
+                $value = isset(self::$config[ $field ]) ? self::$config[ $field ] : null;
+            }
+
+            return $value;
+        }
+        return self::$config;
+    }
 }
- ?>

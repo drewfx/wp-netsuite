@@ -18,10 +18,29 @@ class Gc_Netsuite_Public
         $this->post_data = [
             'firstname' => $_POST['first-name'],
             'lastname' => $_POST['last-name'],
-            'email' => $_POST['email'],
-            'phone' => $_POST['phone-number'],
+            'zipcode' => '',
             'companyname' => $_POST['company'],
-            'comments' => $_POST['comments']
+            'custentity1' => '' ,                 // (company type* might not use)'
+            'address1' => '',
+            'custentity_esc_industry' => '',
+            'city' => '',
+            'state' => '',
+            'zipcode' => '',
+            'country' => '',
+            'phone' => $_POST['phone-number'],
+            'comments' => $_POST['comments'],
+            'url' => '',                          //(web address)
+            'custentity124' => '',                //(web form source)
+            'leadsource' => '',
+            'campaigncategory' => '',
+            'custentity33' => '',                 // (campaign subcategory)
+            'custentity125' => '',                //(keyword search)
+            'custentity129' => '',                //(data integration checkbox)
+            'custentity128' => '',                //(call tracking checkbox)
+            'custentity127' => '',                //(call routing checkbox)
+            'custentity132' => '',                //(800 numbers)
+            'custentity131' => '',                //(leads marketplace)
+            'email' => $_POST['email'],
         ];
 
         $this->submit();

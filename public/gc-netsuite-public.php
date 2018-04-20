@@ -6,9 +6,10 @@ class Gc_Netsuite_Public
   private $version;
   private $post_data;
 
-  public function __construct( $plugin_name, $version ) {
-    $this->plugin_name = $plugin_name;
-    $this->version = $version;
+  public function __construct() {
+      $this->plugin_name    = GC_NETSUITE_PLUGIN_NAME;
+      $this->version        = GC_NETSUITE_VERSION;
+      $this->post_data      = array();
   }
 
   public function submit_posted_data() {
@@ -20,19 +21,19 @@ class Gc_Netsuite_Public
         'companyname' => $_POST['company'],
         'comments' => $_POST['comments']
       ];
-      http_build_query($posted_data);
-      submit();
+
+      $this->submit();
   }
 
-  public function submit(){
+  public function submit() {
     $ch = curl_init();
 
     curl_setopt($ch, CURLOPT_URL, 'https://forms.na1.netsuite.com/app/site/crm/externalleadpage.nl?compid=1046918&formid=5&h=AACffht_-OLEtAl4YYo3343iksp5jSibbAY');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $this->post_data);
 
     $result = curl_exec($ch);
-    var_dump($reult)
+    var_dump($result);
   }
 }

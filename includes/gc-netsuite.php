@@ -17,18 +17,26 @@ class Gc_Netsuite
         $this->plugin_name         = GC_NETSUITE_PLUGIN_NAME;
         $this->plugin_display_name = GC_NETSUITE_PLUGIN_DISPLAY_NAME;
         $this->load_dependencies();
+        $this->define_admin_methods();
         $this->define_public_methods();
     }
 
     private function load_dependencies() {
         require GC_NETSUITE_DIR . '/includes/gc-netsuite-loader.php';
         require GC_NETSUITE_DIR . '/public/gc-netsuite-public.php';
+        require GC_NETSUITE_DIR . '/admin/gc-netsuite-admin.php';
 
         $this->loader = new Gc_Netsuite_Loader();
     }
 
+    public function define_admin_methods() {
+        $plugin_admin = new Gc_Netsuite_Admin();
+        $this->loader->add_action('admin_init', $plugin_admin, 'init_options_page');
+        $this->loader->add_action('admin_menu', $plugin_admin, 'add_options_page');
+    }
+
     private function define_public_methods() {
-        $plugin_public = new Gc_Netsuite_Public($this->plugin_name, $this->version);
+        $plugin_public = new Gc_Netsuite_Public();
         $this->loader->add_filter('wpcf7_before_send_mail', $plugin_public, 'submit_posted_data', 10, 1);
     }
 

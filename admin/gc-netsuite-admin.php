@@ -23,7 +23,7 @@ class Gc_Netsuite_Admin
     }
 
     public function add_options_page() {
-        $this->add_options_page('Netsuite Integration', 'Netsuite', 'manage_options', 'gc_netsuite', array($this, 'render_options_page'));
+        add_options_page('Netsuite Integration', 'Netsuite', 'manage_options', 'gc_netsuite', array($this, 'render_options_page'));
     }
 
     public function init_options_page() {
@@ -60,7 +60,9 @@ class Gc_Netsuite_Admin
     }
 
     public function render_general_description() {
-
+        echo '<h4>Configure Netsuite settings.</h4>' .
+             '<p>Enable the Netsuite Integration for leads to flow through to Netsuite.<br>' .
+             '<strong>Netsuite Endpoint</strong>: where the leads will flow through.<br>';
     }
 
     public function render_enable_netsuite() {

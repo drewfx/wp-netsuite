@@ -6,6 +6,7 @@
  * Link provided by Drew Ruppel.
  *
  * Plugin Name: GC Netsuite
+<<<<<<< HEAD
  * Description: GC Netsuite Integration
  * Version: 1.0.0
  * Authors: Matthew Belanic, Drew Ruppel

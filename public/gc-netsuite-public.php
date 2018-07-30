@@ -2,125 +2,310 @@
 
 class Gc_Netsuite_Public
 {
+    /**
+     * These values are constant in Netsuite.
+     */
+    const WEB_LEAD = 11;
+    const DIAL = 17;
+    const SOCIAL = 205;
+    const ORGANIC = 27597591;
+    const WEB_DIRECT = 28438140;
+    const PPC = 27353440;
+    const COMPANY_TYPE = 65;
+    const PRODUCT_LINE = 46;
+    const SUPPORT = '7131';
+    const CUSTOMER_CARE = '7317';
+
     private $plugin_name;
+    private $admin = 'druppel@goldencomm.com';
     private $version;
     private $post_data;
-    private $endpoint = 'https://forms.na1.netsuite.com/app/site/crm/externalleadpage.nl?compid=1046918&formid=5&h=AACffht_-OLEtAl4YYo3343iksp5jSibbAY';
+    private $endpoint = '';
     private $success = 0;
     private $error = 0;
+    private $response = '';
+
+    /**
+     * Accepted industry types
+     * @var array
+     */
+    private $industries = [
+        'Advertising/Direct Response Agency' => 79,
+        'Franchise' => 83,
+        'Wellness & Fitness' => 86,
+        'Legal Services' => 49,
+        'Educational Services' => 40,
+        'Mortgage Industry' => 52,
+        'Insurance' => 47,
+        'Other' => 53,
+    ];
+
+    /**
+     * Accepted social site designations.
+     * @var array
+     */
+    private $social = [
+        'facebook', 'linkedin',
+        'twitter', 'instagram',
+        'reddit', 'blogger',
+        'stackexchange', 'yelp',
+        'netvibes', 'youtube'
+    ];
 
     public function __construct()
     {
-        $this->plugin_name  = GC_NETSUITE_PLUGIN_NAME;
-        $this->version      = GC_NETSUITE_VERSION;
+        $this->plugin_name = GC_NETSUITE_PLUGIN_NAME;
+        $this->version = GC_NETSUITE_VERSION;
+        $this->endpoint = GC_Netsuite::get_config('netsuite_endpoint');
     }
 
-    public function submit_posted_data()
+    public function init()
     {
-        $this->post_data = array(
-            'firstname'         => $_POST['txt_first_name'],
-            'lastname'          => $_POST['txt_last_name'],
-            'companyname'       => $_POST['txt_company'],
-            'phone'             => $_POST['txt_phone'],
-            'email'             => $_POST['txt_email_address'],
-            //'custentity_esc_industry' => $_POST['industry'],
-            //'comments'          => $_POST['comments'],
-            //'url'               => '',                            //(web address)
-            //'custentity124'     => $_POST['lead_source_details'], //(web form source)
-            'campaigncategory'  => '12',
-            //'custentity33'      => $this->get_ppc(),            // (campaign subcategory)
-            //'custentity125'     => $this->get_keyword(),        // (keyword search)
-            //'custentity129'     => $_POST['dataintegration'],   // (data integration checkbox)
-            //'custentity128'     => $_POST['calltracking'],      // (call tracking checkbox)
-            //'custentity127'     => $_POST['callrouting'],       // (call routing checkbox)
-            //'custentity132'     => $_POST['vanitynumbers'],     // (800 numbers)
-            'custentity131'     => ($_POST['leadsmarketplace']) ? "T" : "",  // (leads marketplace)
-            //'custentitybulknumbers' => $_POST['bulknumbers'],
-            'custentity32'      => ($_POST['newslttr']) ? "T" : "",        // (newsletter)
-            //'custentityreferrer'=> $this->get_referrer(),
-            //'custentitygclid'   => $this->get_gclid(),
-            'custentity131_send' => '',
-            'custentity32_send' => '',
-        );
-
-        #$this->clean();
-        $this->submit();
+        $this->save_ppc_value_in_session();
+        $this->save_referrer_in_session();
+        $this->save_uri_to_session();
     }
-
-
-    public function clean()
-    {
-        foreach ($this->post_data as $k => $v) {
-            if (empty(trim($v))) {
-                unset($this->post_data[$k]);
-            }
-        }
-    }
-
 
     /**
-   * log it
-   */
-    public function submit()
+     * Saves the PPC (pay per click) value to the session.
+     */
+    public function save_ppc_value_in_session()
     {
-        try {
-            $ch = curl_init();
+        $ppc_keyword = Gc_Netsuite::get_config('ppc_keyword');
+        if ($ppc_keyword && isset($_GET[$ppc_keyword]) && !isset($_SESSION[Gc_Netsuite::PPC_SESSION_NAME])) {
+            $_SESSION[Gc_Netsuite::PPC_SESSION_NAME] = $_GET[$ppc_keyword];
+        }
+    }
 
-            curl_setopt($ch, CURLOPT_URL, $this->endpoint);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $this->post_data);
-            curl_setopt($ch, CURLOPT_HEADER, true);
-            curl_setopt($ch, CURLOPT_NOBODY, true);
+    /**
+     * Saves the referrer to the local domain to the session.
+     */
+    public function save_referrer_in_session()
+    {
+        if (!isset($_SESSION['off_site_referrer'])) {
+            $_SESSION['off_site_referrer'] = $_SERVER['HTTP_REFERER'];
+        }
+    }
 
-            $result = curl_exec($ch);
+    /**
+     * Concatenates the 'visited path' to the session for submission.
+     */
+    public function save_uri_to_session()
+    {
+        global $wp_the_query;
+        if (!isset($_SESSION['VISITED_PATH']))
+            $_SESSION['VISITED_PATH'] = '';
+        if (!$wp_the_query->is_404)
+            $_SESSION['VISITED_PATH'] .= "\n$_SERVER[REQUEST_URI]";
+    }
 
-            $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    /**
+     * Format our posted data, clean and then submit.
+     * Refer to the web lead form in Netsuite: Setup -> Sales & Marketing Automation -> Online Customer Forms
+     * before adding any additional fields. An associated ID will be required to pass the fields or it will error out.
+     */
+    public function submit_posted_data()
+    {
+        $enabled = boolval(Gc_Netsuite::get_config('enable_netsuite'));
 
-            var_dump([$this->post_data, $result, $httpcode]);
+        if ($enabled && !$this->support()) {
+            $this->post_data = array(
+                'compid' => 1046918,                                     // web form fields
+                'formid' => 5,                                           // web form fields
+                'h' => 'AACffht_-OLEtAl4YYo3343iksp5jSibbAY',       // web form fields
+                'firstname' => $this->get_firstname(),
+                'lastname' => $this->get_lastname(),
+                'companyname' => $this->get_company(),
+                'phone' => $this->get_phone(),
+                'email' => $this->get_email(),
+                'custentity_esc_industry' => $this->get_industry(),
+                'comments' => $this->get_comments(),
+                'custentity124' => $this->get_submission_url(),                 // submission url
+                'leadsource' => $this->get_ppc(),                            // lead source
+                'custentity73' => self::WEB_LEAD,                              // campaign category
+                'custentity33' => self::DIAL,                                  // campaign subcategory
+                'custentity1' => self::COMPANY_TYPE,                          // company type
+                'custentity125' => $this->get_keyword(),                        // search keyword
+                'custentity129' => $this->checkbox($_POST['dataintegration']),
+                'custentity128' => $this->checkbox($_POST['calltracking']),
+                'custentity127' => $this->checkbox($_POST['callrouting']),
+                'custentity131' => $this->checkbox($_POST['leadsmarketplace']),
+                'custentitybulknumbers' => $this->checkbox($_POST['bulknumbers']),
+                'custentity32' => $this->get_newsletter($_POST['newslttr']),
+                'custentity132' => $this->checkbox($_POST['vanitynumbers']),
+                'custentityreferrer' => $this->get_referrer(),
+                'custentitygclid' => $this->get_gclid(),
+                'custentity19' => $this->get_date(),
+                'custentity12' => self::PRODUCT_LINE
+            );
 
-            if ($httpcode == '302') {
-                $this->success = 1;
-                $this->log_in_db("Success");
-            } else {
-                $this->error = 1;
-                $this->log_in_db("Failure");
+            $this->clean();
+            $this->submit();
+        }
+    }
+
+    private function support()
+    {
+        return ($_POST['_wpcf7'] == self::SUPPORT || $_POST['_wpcf7'] == self::CUSTOMER_CARE);
+    }
+
+    /**
+     * @return string
+     */
+    private function get_firstname()
+    {
+        return $_POST['txt_first_name'];
+    }
+
+    /**
+     * @return string
+     */
+    private function get_lastname()
+    {
+        return $_POST['txt_last_name'];
+    }
+
+    /**
+     * @return string
+     */
+    private function get_company()
+    {
+        return $_POST['txt_company'];
+    }
+
+    /**
+     * @return string
+     */
+    private function get_phone()
+    {
+        return $_POST['txt_phone'];
+    }
+
+    /**
+     * @return string
+     */
+    private function get_email()
+    {
+        return $_POST['txt_email_address'];
+    }
+
+    /**
+     * Search the array for a value matching our submitted value.
+     *
+     * @default string 'Other'
+     * @return false|int|string
+     */
+    private function get_industry()
+    {
+        $industry = array_search($_POST['industry'],
+            array_reverse(
+                $this->industries
+            )
+        );
+
+        if ($industry === false) {
+            $industry = $this->industries['Other'];
+        }
+        return $industry;
+    }
+
+    /**
+     * @return string
+     */
+    private function get_comments()
+    {
+        return (isset($_POST['notes'])) ? $_POST['notes'] : '';
+    }
+
+    /**
+     * @return string
+     */
+    private function get_submission_url()
+    {
+        return explode('?', $_SERVER['HTTP_REFERER'])[0];
+    }
+
+    /**
+     * @return string
+     */
+    private function get_ppc()
+    {
+        $source = self::WEB_DIRECT;
+        $ppc = $this->_get_ppc();
+        $ref_host = $this->get_referrer_host();
+
+        if (!empty($ppc)) {
+            $source = self::PPC;
+        } else if (!empty($ref_host)) {
+            $source = self::ORGANIC;
+
+            foreach ($this->social as $k => $v) {
+                if (stripos($ref_host, $v) !== false) {
+                    $source = self::SOCIAL;
+                    break;
+                }
             }
-        } catch (Exception $e) {
-            $this->error = 1;
-            $this->log_in_db($e->getMessage());
         }
+
+        return $source;
     }
 
-    public function log_in_db($message)
+    private function _get_ppc()
     {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'gc_netsuite_posts';
+        return isset($_SESSION['ppc']) ? ucwords($_SESSION['ppc']) : null;
+    }
 
-        try {
-            $wpdb->insert($table_name, array(
-                'url'     => $this->endpoint,
-                'data'    => http_build_query($this->post_data),
-                'success' => $this->success,
-                'error'   => $this->error,
-                'message' => $message
-            ));
-        } catch (\Exception $e) {
-            var_dump($e->getMessage());
+    /**
+     * @return string
+     */
+    private function get_referrer_host()
+    {
+        $referrer = $this->get_referrer();
+
+        if ($referrer) {
+            return parse_url($referrer, PHP_URL_HOST);
         }
+
+        return '';
     }
 
-    public function get_referrer()
+    /**
+     * @return string
+     */
+    private function get_referrer()
     {
-        return isset($_SESSION['off_site_referrer']) ? $_SESSION['off_site_referrer'] : null;
+        return isset($_SESSION['off_site_referrer']) ? $_SESSION['off_site_referrer'] : '';
     }
 
-    public function get_keyword()
+    /**
+     * @return string
+     */
+    private function get_keyword()
     {
-        return isset($_SESSION['search_keyword']) ? $_SESSION['search_keyword'] : null;
+        return isset($_SESSION['search_keyword']) ? $_SESSION['search_keyword'] : '';
     }
 
-    public function get_gclid()
+    /**
+     * @return string
+     */
+    private function checkbox($value)
+    {
+        return (!empty($value)) ? 'T' : '';
+    }
+
+    /**
+     * @param $value
+     * @return string
+     */
+    private function get_newsletter($value)
+    {
+        return (!empty($value)) ? 'Yes' : 'No';
+    }
+
+    /**
+     * @return string
+     */
+    private function get_gclid()
     {
         if (!isset($_COOKIE['gclid']) || (isset($_GET['gclid']) && !isset($_SESSION['gclid']))) {
             return null;
@@ -133,53 +318,94 @@ class Gc_Netsuite_Public
             setcookie('gclid', $gclid, ($expire * 30), '/', $domain);
         }
 
-        return isset($_COOKIE['gclid']) ? $_COOKIE['gclid'] : null ;
+        return isset($_COOKIE['gclid']) ? $_COOKIE['gclid'] : '';
     }
 
-    public function get_ppc() 
+    /**
+     * @return string mm/dd/yyyy
+     */
+    private function get_date()
     {
-        $ppc = $this->_get_ppc();
-        $source = 'Direct';
-        $url = $_SESSION['off_site_referrer'];
+        return date('m/d/Y');
+    }
 
-        if (!empty($ppc)) {
-            switch($ppc) {
-                case 'google': $source = 'Google AdWords'; break;
-                case 'bing'  : $source = 'Bing Paid'; break;
-                case 'yahoo' : $source = 'Yahoo Paid'; break;
-                default      : $source = ucwords($ppc); break;
-            }
-        } else if (!empty($url)) {
-            $source = '';
-            $common_sites = [
-                'google'        => 'Google Organic',
-                'bing'          => 'Bing Organic',
-                'yahoo'         => 'Yahoo Organic',
-                'facebook'      => 'Facebook Social',
-                'linkedin'      => 'LinkedIn Social',
-                'twitter'       => 'Twitter Social',
-                'instagram'     => 'Instagram Social',
-                'reddit'        => 'Reddit Social',
-                'blogger'       => 'Blogger Social',
-                'stackexchange' => 'Stack Exchange Social',
-                'yelp'          => 'Yelp Social',
-                'netvibes'      => 'Netvibes Social',
-                'youtube'       => 'YouTube Social',
-            ];
-            $source = 'Organic';
-            foreach ($common_sites as $id => $label) {
-                if (__str_contains($url, $id)) {
-                    $source = $label;
-                    break;
-                }
+    /***       ~~~~~~~~~~~~~~~~~       ***/
+    /***       User Info Methods       ***/
+    /***       ~~~~~~~~~~~~~~~~~       ***/
+
+    /**
+     * Clean empty values from the post data.
+     */
+    public function clean()
+    {
+        foreach ($this->post_data as $k => $v) {
+            if (empty(trim($v))) {
+                unset($this->post_data[$k]);
             }
         }
-
-        return 'W2L: ' . $source;
     }
 
-    protected function _get_ppc()
+    /**
+     * Submits the data to our Netsuite endpoint.
+     * Logs success/error to `{prefix?}gc_netsuite_posts`
+     */
+    public function submit()
     {
-        return isset($_SESSION['ppc']) ? ucwords($_SESSION['ppc']) : null;
+        $query = http_build_query($this->post_data);
+
+        try {
+            $ch = curl_init();
+
+            curl_setopt($ch, CURLOPT_URL, $this->endpoint . $query);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HEADER, false);
+            curl_setopt($ch, CURLOPT_SSLVERSION, 6);
+
+            $this->response = curl_exec($ch);
+
+            if ($this->response === false) {
+                $this->error = 1;
+                $this->log_in_db(sprintf(
+                        'Curl failed with error #%d: %s',
+                        curl_error($ch), curl_errno($ch))
+                );
+            } else {
+                $this->success = 1;
+                $this->log_in_db("Success");
+            }
+
+            curl_close($ch);
+
+        } catch (\Exception $e) {
+            $this->log_in_db(sprintf(
+                    'Curl failed with error #%d: %s',
+                    $e->getCode(), $e->getMessage())
+            );
+        }
+    }
+
+    /**
+     * Log information in the database.
+     * @param $message
+     */
+    private function log_in_db($message)
+    {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gc_netsuite_posts';
+
+        try {
+            $wpdb->insert($table_name, array(
+                'submitted' => date('Y-m-d H:i:s'),
+                'url' => $this->endpoint,
+                'data' => http_build_query($this->post_data),
+                'response' => $this->response,
+                'success' => $this->success,
+                'error' => $this->error,
+                'message' => $message
+            ));
+        } catch (\Exception $e) {
+            error_log($e->getMessage(), 1, $this->admin);
+        }
     }
 }
